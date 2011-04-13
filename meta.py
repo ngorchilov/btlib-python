@@ -117,7 +117,6 @@ class Meta(dict):
 		return True
 	
 	def fetch(self, url, timeout = None):
-		print url
 		infile = urllib2.urlopen(url, timeout)
 		if infile.info().gettype() != 'application/x-bittorrent':
 			self.clear()
