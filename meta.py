@@ -36,12 +36,13 @@ class Meta(dict):
 		
 	def set(self, torrent):
 		self.clear()
-		if type(torrent) is types.StringType: # bencoded data
-			self.update(btlib.bcode.bdecode(torrent))
-		elif type(bittorrent) is types.DictionaryType: # bdecoded data
-			self.update(torrent.copy())
-		else:
-			raise ValueError
+		if torrent:
+			if type(torrent) is types.StringType: # bencoded data
+				self.update(btlib.bcode.bdecode(torrent))
+			elif type(torrent) is types.DictionaryType: # bdecoded data
+				self.update(torrent.copy())
+			else:
+				raise ValueError
 	
 	def info_hash(self):
 		if 'info' in self:
