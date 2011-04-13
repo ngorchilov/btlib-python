@@ -124,7 +124,10 @@ class Meta(dict):
 		else:
 			data = infile.read()
 			if infile.headers.get('content-encoding', '') == "gzip":
-				data = zlib.decompress(data, 16+zlib.MAX_WBITS)
+				try:
+					data = zlib.decompress(data, 16+zlib.MAX_WBITS)
+				except:
+					data = None
 			self.set(data)
 		infile.close()
 		return self
