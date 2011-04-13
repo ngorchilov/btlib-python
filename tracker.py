@@ -51,7 +51,6 @@ class Tracker():
 		
 		res=[]	
 		# call the tracker and read the response in a dictionary
-		ua = urllib2.urlopen(url)
 		try:
 			ua = urllib2.urlopen(url)
 			try:
