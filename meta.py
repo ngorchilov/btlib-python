@@ -54,10 +54,13 @@ class Meta(dict):
 		if self['info'].has_key('name.utf-8'):
 			return unicode(self['info']['name.utf-8'], 'utf8')
 		else:
-			try:
-				return unicode(self['info']['name'], chardet.detect(self['info']['name'])['encoding'])
-			except:
-				return None
+			if self['info'].has_key('encoding'):
+				return unicode(self['info']['name'], self['info']['encoding'])
+			else:
+				try:
+					return unicode(self['info']['name'], chardet.detect(self['info']['name'])['encoding'])
+				except:
+					return None
 
 	def encode(self):
 		return btlib.bcode.bencode(self)
