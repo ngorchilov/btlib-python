@@ -38,7 +38,10 @@ class Meta(dict):
 		self.clear()
 		if torrent:
 			if type(torrent) is types.StringType: # bencoded data
-				self.update(btlib.bcode.bdecode(torrent))
+				try:
+					self.update(btlib.bcode.bdecode(torrent))
+				except:
+					pass;
 			elif type(torrent) is types.DictionaryType: # bdecoded data
 				self.update(torrent.copy())
 			else:
