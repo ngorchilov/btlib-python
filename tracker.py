@@ -66,9 +66,10 @@ class Tracker():
 		return(res)
 		
 	# announce info_hash to a tracker and collect peers, bdecode the output and return normalized directory
-	def announce(self, info_hash, cmd):
+	def announce(self, info_hash, cmd, me):
 	
 		url = self.announce_url + '?info_hash=' + urllib2.quote(btlib.infohash.hex2bin(info_hash)) + "&port=65000&uploaded=0&downloaded=0&left=0&compact=1&event=started&numwant=100&peer_id=00000000000000000000" + "&event=" + cmd
+		if me: url += "&me=1"
 		res=[]
 		# call the tracker and read the response in a dictionary
 		try:
