@@ -90,9 +90,11 @@ class Meta(dict):
 			self['announce'] = announce[0][0]
 			self['announce-list'] = []
 			for a in announce: self['announce-list'].append(a)
+			return self['announce-list']
 		else: # single string
 			if 'announce-list' in self: del self['announce-list']
 			self['announce'] = announce
+			return self['announce']
 
 	def size(self):
 		s = 0
