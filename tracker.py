@@ -47,7 +47,7 @@ class Tracker():
 #				url += 'info_hash=' + info_hash + '&'
 			url = url.rstrip('&')
 
-		print "Scraping ", url
+#		print "Scrapping ", url
 		
 		res=[]	
 		# call the tracker and read the response in a dictionary
