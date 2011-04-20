@@ -27,6 +27,9 @@ class Meta(dict):
 			self.pp = pprint.PrettyPrinter(indent = kargs.pop('indent'))
 		else:
 			self.pp = pprint.PrettyPrinter(indent = 4)
+		if 'key' in kargs: self.key(key = kargs.pop('key'))
+		if 'keyfile' in kargs: self.key(filename = kargs.pop('keyfile'))
+			
 
 		super(Meta, self).__init__(kargs)
 
@@ -46,7 +49,15 @@ class Meta(dict):
 				self.update(torrent.copy())
 			else:
 				raise ValueError
-	
+
+	def key(self, **kargs):
+		if 'key' in kargs: self.key_value = kargs.pop('key')
+		if 'filename' in kargs:
+			f = open(kargs.pop('filename'), 'rb')
+			self.key_value = f.read(20);
+			f.close()
+		return self.key_value
+		
 	def info_hash(self):
 		if 'info' in self:
 			return hashlib.sha1(btlib.bcode.bencode(self['info']))
