@@ -2,13 +2,12 @@ import btlib.bcode
 import types
 import pprint
 import hashlib
+import binascii
 import StringIO
 import urllib2
 import os
 import zlib
 import chardet
-
-version = "0.1.1"
 
 class Meta(dict):
 
@@ -58,6 +57,25 @@ class Meta(dict):
 			self.key_value = f.read(20);
 			f.close()
 		return self.key_value
+
+	def obfuscate(self, data, key=None):
+		if not key: key = self.key()
+		l = len(key)
+		
+		buff = ""
+		for i in range(0, len(data)):
+			buff += chr(ord(data[i]) ^ ord(key[i % l]))
+		return buff
+	
+	def info_hash(self):
+		if 'info' in self:
+#			return hashlib.sha1(btlib.bcode.bencode(self['info'])).hexdigest().lower()
+			return hashlib.sha1(btlib.bcode.bencode(self['info']))
+		else:
+			return None
+	
+	def info_hash_obfuscated(self):
+		return self.obfuscate(self.info_hash().digest())
 		
 	def pieces_generator(self, debug=False):
 		"""Yield pieces from download file(s)."""
@@ -90,6 +108,24 @@ class Meta(dict):
 					return
 				yield piece
 
+	def obfuscated_pieces_generator(self, debug=False):
+		# key
+		key = self.key()
+		
+		# rotation index
+		rindex = self['info']['piece length'] % len(key)
+
+		for piece in self.pieces_generator(debug):
+
+			# obfuscate the piece
+			piece = self.obfuscate(piece, key)
+
+			# yeld the piece
+			yield piece
+			
+			# rotate the key
+			key = key[rindex:]+key[:rindex]
+
 	def hash_check(self, debug=False):
 		pieces = StringIO.StringIO(self['info']['pieces'])
 		for piece in self.pieces_generator(debug):
@@ -103,12 +139,6 @@ class Meta(dict):
 
 		return True
 
-	def info_hash(self):
-		if 'info' in self:
-			return hashlib.sha1(btlib.bcode.bencode(self['info']))
-		else:
-			return None
-		
 	def name(self):
 		if self['info'].has_key('name.utf-8'):
 			return unicode(self['info']['name.utf-8'], 'utf8')
