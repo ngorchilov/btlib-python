@@ -2,6 +2,7 @@ import btlib.bcode
 import types
 import pprint
 import hashlib
+import StringIO
 import urllib2
 import os
 import zlib
@@ -18,7 +19,7 @@ class Meta(dict):
 
 		if 'torrent' in kargs: meta = kargs.pop('torrent')
 		if 'datadir' in kargs:
-			self.datadir = kargs.pop('datadir')
+			self.datadir = str(kargs.pop('datadir')).rstrip('/')
 		else:
 			self.datadir = "."
 		if 'filename' in kargs: self.filename = kargs.pop('filename')
@@ -58,6 +59,50 @@ class Meta(dict):
 			f.close()
 		return self.key_value
 		
+	def pieces_generator(self, debug=False):
+		"""Yield pieces from download file(s)."""
+		piece_length = self['info']['piece length']
+		if 'files' in self['info']: # yield pieces from a multi-file torrent
+			piece = ""
+			for file_info in self['info']['files']:
+				if debug and vars().has_key('path'): print "OK"
+				path = os.sep.join([self.datadir, self.name()] + file_info['path'])
+				if debug: print "%s: " % path,
+				sfile = open(path.decode('UTF-8'), "rb")
+				while True:
+					piece += sfile.read(piece_length-len(piece))
+					if len(piece) != piece_length:
+						sfile.close()
+						break
+					yield piece
+					piece = ""
+			if piece != "":
+				yield piece
+			if debug: print "OK"
+		else: # yield pieces from a single file torrent
+			path = self.name()
+			print path
+			sfile = open(path.decode('UTF-8'), "rb")
+			while True:
+				piece = sfile.read(piece_length)
+				if not piece:
+					sfile.close()
+					return
+				yield piece
+
+	def hash_check(self, debug=False):
+		pieces = StringIO.StringIO(self['info']['pieces'])
+		for piece in self.pieces_generator(debug):
+			# Compare piece hash with expected hash
+			piece_hash = hashlib.sha1(piece).digest()
+			if (piece_hash != pieces.read(20)):
+				return False
+		# ensure we've read all pieces 
+		if pieces.read():
+			return False
+
+		return True
+
 	def info_hash(self):
 		if 'info' in self:
 			return hashlib.sha1(btlib.bcode.bencode(self['info']))
