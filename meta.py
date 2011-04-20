@@ -8,6 +8,7 @@ import urllib2
 import os
 import zlib
 import chardet
+import struct
 
 class Meta(dict):
 
@@ -60,12 +61,23 @@ class Meta(dict):
 
 	def obfuscate(self, data, key=None):
 		if not key: key = self.key()
-		l = len(key)
+
+		index = len(data) % 4
+		size = (4, 1, 2, 1)[index]
+		type = ('L', 'B', 'H', 'B')[index]
+		key_len = len(key)/size
+		data_len = len(data)/size
+		key_fmt = "<" + str(key_len) + type;
+		data_fmt = "<" + str(data_len) + type;
 		
-		buff = ""
-		for i in range(0, len(data)):
-			buff += chr(ord(data[i]) ^ ord(key[i % l]))
-		return buff
+		key_list = struct.unpack(key_fmt, key)
+		data_list = struct.unpack(data_fmt, data)
+
+		result = []
+		for i in range(data_len):
+			result.append (key_list[i % key_len] ^ data_list[i])
+		
+		return struct.pack(data_fmt, *result)
 	
 	def info_hash(self):
 		if 'info' in self:
