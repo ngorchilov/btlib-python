@@ -126,12 +126,9 @@ class Meta(dict):
 		pos = 0
 		
 		for piece in self.pieces_generator(debug):
-			# obfuscate the master key
-			piece_sha1 = pieces.read(20)
-			okey = self.obfuscate(piece_sha1)
 
-			# obfuscate the piece data with obfuscated key
-			piece = self.obfuscate(piece, piece_sha1, pos)
+			# obfuscate the piece data piece's sha1
+			piece = self.obfuscate(piece, pieces.read(20), pos)
 
 			# yeld the piece
 			yield piece
