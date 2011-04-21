@@ -8,7 +8,8 @@ import urllib2
 import os
 import zlib
 import chardet
-import struct
+import numpy
+import math
 
 class Meta(dict):
 
@@ -61,38 +62,23 @@ class Meta(dict):
 
 	def obfuscate(self, data, key=None, pos=0):
 		if not key: key = self.key()
-		key = key[pos:]+key[:pos]
 
+		# rotate the key
+		key = key[pos:]+key[:pos]
+		
+		# multiply it in order to match the data's size
+		key = (key*int(math.ceil(float(len(data))/float(len(key)))))[:len(data)]
+
+		# Select the type size		
 		for i in (8,4,2,1):
 			if not len(data) % i: break
+
+		if i == 8: dt = numpy.dtype('<Q8');
+		elif i == 4: dt = numpy.dtype('<L4');
+		elif i == 2: dt = numpy.dtype('<H2');
+		else: dt = numpy.dtype('B');
 		
-		if i == 8:
-			size = 8
-			type = 'Q'
-			key += key
-		elif i == 4:
-			size = 4
-			type = 'L'
-		elif i == 2:
-			size = 2
-			type = 'H'
-		else:
-			size = 1
-			type = 'B'
-
-		key_len = len(key)/size
-		data_len = len(data)/size
-		key_fmt = "<" + str(key_len) + type;
-		data_fmt = "<" + str(data_len) + type;
-
-		key_list = struct.unpack(key_fmt, key)
-		data_list = struct.unpack(data_fmt, data)
-
-		result = []
-		for i in range(data_len):
-			result.append (key_list[i % key_len] ^ data_list[i])
-
-		return struct.pack(data_fmt, *result)
+		return numpy.bitwise_xor(numpy.fromstring(key, dtype=dt), numpy.fromstring(data, dtype=dt)).tostring()
 	
 	def info_hash(self):
 		if 'info' in self:
