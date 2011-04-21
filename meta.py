@@ -59,24 +59,39 @@ class Meta(dict):
 			f.close()
 		return self.key_value
 
-	def obfuscate(self, data, key=None):
+	def obfuscate(self, data, key=None, pos=0):
 		if not key: key = self.key()
+		key = key[pos:]+key[:pos]
 
-		index = len(data) % 4
-		size = (4, 1, 2, 1)[index]
-		type = ('L', 'B', 'H', 'B')[index]
+		for i in (8,4,2,1):
+			if not len(data) % i: break
+		
+		if i == 8:
+			size = 8
+			type = 'Q'
+			key += key
+		elif i == 4:
+			size = 4
+			type = 'L'
+		elif i == 2:
+			size = 2
+			type = 'H'
+		else:
+			size = 1
+			type = 'B'
+
 		key_len = len(key)/size
 		data_len = len(data)/size
 		key_fmt = "<" + str(key_len) + type;
 		data_fmt = "<" + str(data_len) + type;
-		
+
 		key_list = struct.unpack(key_fmt, key)
 		data_list = struct.unpack(data_fmt, data)
 
 		result = []
 		for i in range(data_len):
 			result.append (key_list[i % key_len] ^ data_list[i])
-		
+
 		return struct.pack(data_fmt, *result)
 	
 	def info_hash(self):
@@ -121,22 +136,22 @@ class Meta(dict):
 				yield piece
 
 	def obfuscated_pieces_generator(self, debug=False):
-		# key
-		key = self.key()
+		pieces = StringIO.StringIO(self['info']['pieces'])
+		pos = 0
 		
-		# rotation index
-		rindex = self['info']['piece length'] % len(key)
-
 		for piece in self.pieces_generator(debug):
+			# obfuscate the master key
+			piece_sha1 = pieces.read(20)
+			okey = self.obfuscate(piece_sha1)
 
-			# obfuscate the piece
-			piece = self.obfuscate(piece, key)
+			# obfuscate the piece data with obfuscated key
+			piece = self.obfuscate(piece, piece_sha1, pos)
 
 			# yeld the piece
 			yield piece
 			
-			# rotate the key
-			key = key[rindex:]+key[:rindex]
+			# set new position
+			pos += self['info']['piece length']
 
 	def hash_check(self, debug=False):
 		pieces = StringIO.StringIO(self['info']['pieces'])
