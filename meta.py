@@ -97,7 +97,7 @@ class Meta(dict):
 			piece = ""
 			for file_info in self['info']['files']:
 				if debug and vars().has_key('path'): print "OK"
-				path = os.sep.join([self.datadir, self.name()] + file_info['path'])
+				path = os.sep.join([self.datadir, self['info']['name']] + file_info['path'])
 				if debug: print "%s: " % path,
 				sfile = open(path.decode('UTF-8'), "rb")
 				while True:
