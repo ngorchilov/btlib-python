@@ -158,7 +158,7 @@ class Meta(dict):
 				try:
 					return unicode(self['info']['name'], chardet.detect(self['info']['name'])['encoding'])
 				except:
-					return None
+					return self['info']['name']
 
 	def encode(self):
 		return btlib.bcode.bencode(self)
