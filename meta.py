@@ -2,7 +2,6 @@ import btlib.bcode
 import types
 import pprint
 import hashlib
-import binascii
 import StringIO
 import urllib2
 import os
@@ -62,24 +61,24 @@ class Meta(dict):
 
 	def obfuscate(self, data, key=None, pos=0):
 		if not key: key = self.key()
-
+	
 		# rotate the key
 		key = key[pos:]+key[:pos]
 		
-		# multiply it in order to match the data's size
+		# multiplicate it in order to match the data's size
 		key = (key*int(math.ceil(float(len(data))/float(len(key)))))[:len(data)]
-
+	
 		# Select the type size		
 		for i in (8,4,2,1):
 			if not len(data) % i: break
-
+	
 		if i == 8: dt = numpy.dtype('<Q8');
 		elif i == 4: dt = numpy.dtype('<L4');
 		elif i == 2: dt = numpy.dtype('<H2');
 		else: dt = numpy.dtype('B');
 		
 		return numpy.bitwise_xor(numpy.fromstring(key, dtype=dt), numpy.fromstring(data, dtype=dt)).tostring()
-	
+		
 	def info_hash(self):
 		if 'info' in self:
 #			return hashlib.sha1(btlib.bcode.bencode(self['info'])).hexdigest().lower()
@@ -228,10 +227,7 @@ class Meta(dict):
 		else:
 			data = infile.read()
 			if infile.headers.get('content-encoding', '') == "gzip":
-				try:
-					data = zlib.decompress(data, 16+zlib.MAX_WBITS)
-				except:
-					data = None
+				data = zlib.decompress(data, 16+zlib.MAX_WBITS)
 			self.set(data)
 		infile.close()
 		return self
