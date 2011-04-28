@@ -6,7 +6,6 @@ import StringIO
 import urllib2
 import os
 import zlib
-import chardet
 import numpy
 import math
 
@@ -81,7 +80,6 @@ class Meta(dict):
 		
 	def info_hash(self):
 		if 'info' in self:
-#			return hashlib.sha1(btlib.bcode.bencode(self['info'])).hexdigest().lower()
 			return hashlib.sha1(btlib.bcode.bencode(self['info']))
 		else:
 			return None
@@ -89,63 +87,84 @@ class Meta(dict):
 	def info_hash_obfuscated(self):
 		return self.obfuscate(self.info_hash().digest())
 		
-	def pieces_generator(self, debug=False):
-		"""Yield pieces from download file(s)."""
+	def pieces_generator(self, hash_check=True, debug=False):
+		"""Yield pieces and their sha1 checksum from data file(s)."""
 		piece_length = self['info']['piece length']
+		if hash_check:
+			pieces = StringIO.StringIO(self['info']['pieces'])
+
 		if 'files' in self['info']: # yield pieces from a multi-file torrent
 			piece = ""
 			for file_info in self['info']['files']:
 				if debug and vars().has_key('path'): print "OK"
-				path = os.sep.join([self.datadir, self['info']['name']] + file_info['path'])
+				path = os.sep.join([self.base()] + file_info['path']).decode('UTF-8')
 				if debug: print "%s: " % path,
-				sfile = open(path.decode('UTF-8'), "rb")
+				sfile = open(path, "rb")
 				while True:
 					piece += sfile.read(piece_length-len(piece))
 					if len(piece) != piece_length:
 						sfile.close()
 						break
-					yield piece
+					
+					if hash_check:
+						yield (piece, hashlib.sha1(piece).digest() == pieces.read(20))
+					else:
+						yield (piece, True)
+						
 					piece = ""
-			if piece != "":
-				yield piece
-			if debug: print "OK"
+			# Last piece
+			if piece != "": # If found
+				if hash_check:
+					yield (piece, hashlib.sha1(piece).digest() == pieces.read(20))
+				else:
+					yield (piece, True)
+				if debug: print "OK"
+			elif hash_check and pieces.read(20): # If data finished but there still unerad piece hashes in the stream report this fact
+				yield (None, False)
+			
 		else: # yield pieces from a single file torrent
-			path = self.name()
-			print path
-			sfile = open(path.decode('UTF-8'), "rb")
+			path =  self.base()
+			if debug: print "%s: " % path,
+			sfile = open(path, "rb")
 			while True:
 				piece = sfile.read(piece_length)
 				if not piece:
 					sfile.close()
-					return
-				yield piece
+					
+					# ensure we've read all pieces
+					if pieces.read(20):
+						yield (None, False)
+					else:
+						if debug: print "OK"
+				if hash_check:
+					yield (piece, hashlib.sha1(piece).digest() == pieces.read(20))
+				else:
+					yield (piece, True)
 
-	def obfuscated_pieces_generator(self, debug=False):
+	def obfuscated_pieces_generator(self, hash_check=True, debug=False):
 		pieces = StringIO.StringIO(self['info']['pieces'])
 		pos = 0
 		
-		for piece in self.pieces_generator(debug):
+		for (piece, check) in self.pieces_generator(hash_check, debug):
+
+			# hash-check
+			if hash_check and not check:
+				yield (None, False)
 
 			# obfuscate the piece data piece's sha1
 			piece = self.obfuscate(piece, pieces.read(20), pos)
 
 			# yeld the piece
-			yield piece
+			yield (piece, check)
 			
 			# set new position
 			pos += self['info']['piece length']
 
 	def hash_check(self, debug=False):
-		pieces = StringIO.StringIO(self['info']['pieces'])
-		for piece in self.pieces_generator(debug):
-			# Compare piece hash with expected hash
-			piece_hash = hashlib.sha1(piece).digest()
-			if (piece_hash != pieces.read(20)):
+		for (piece, check) in self.pieces_generator(True, debug):
+			if not check:
+				if debug: print "ERR"
 				return False
-		# ensure we've read all pieces 
-		if pieces.read():
-			return False
-
 		return True
 
 	def name(self):
@@ -155,10 +174,10 @@ class Meta(dict):
 			if self['info'].has_key('encoding'):
 				return unicode(self['info']['name'], self['info']['encoding'])
 			else:
-				try:
-					return unicode(self['info']['name'], chardet.detect(self['info']['name'])['encoding'])
-				except:
-					return self['info']['name']
+				return self['info']['name']
+					
+	def base(self):
+		return os.sep.join([self.datadir, self['info']['name']]).decode('UTF-8')
 
 	def encode(self):
 		return btlib.bcode.bencode(self)
@@ -220,6 +239,18 @@ class Meta(dict):
 		outfile.close()
 		return True
 	
+	def obfuscate_data(self, filename, hash_check=True, debug = False):
+		st = os.stat(self.base())
+		outfile = open(filename, 'wb')
+#		os.utime(filename, (st.st_atime, st.st_mtime))
+		for (piece, check) in self.obfuscated_pieces_generator(hash_check, debug):
+			if hash_check and not check:
+				return False
+#			outfile.write(piece)
+		outfile.close()
+		os.utime(filename, (st.st_atime, st.st_mtime))
+		return True
+	
 	def fetch(self, url, timeout = None):
 		infile = urllib2.urlopen(url, timeout)
 		if infile.info().gettype() != 'application/x-bittorrent':
@@ -241,18 +272,17 @@ class Meta(dict):
 		if os.path.exists(self.datadir):
 			custom_storage = os.path.isfile(self.datadir)
 		else:
-			raise
+			return False
 		
 		files = []
 		size = 0
 		
 		if self.is_dir():
 			for file in self['info']['files']:
-#				path = os.path.join(*[self.datadir, self['info']['name']] + file['path'])
-				files.append(os.path.join(*[self['info']['name']] + file['path']))
+				files.append(os.sep.join([self['info']['name']] + file['path']).decode('UTF-8'))
 				size += file['length']
 		else:
-			files.append(self['info']['name'])
+			files.append(self['info']['name'].decode('UTF-8'))
 			size = self['info']['length']
 		
 		self['libtorrent_resume'] = {
@@ -264,9 +294,11 @@ class Meta(dict):
 			if custom_storage:
 				file = self.datadir
 			else:
-				file = os.path.join(self.datadir, file)
+				file = os.sep.join([self.datadir, file])
 
 			if os.path.exists(file):
 				self['libtorrent_resume']['files'].append({'priority': long(2), 'mtime': long(os.stat(file).st_mtime)})
 			else:
-				raise
+				return False
+		
+		return True
