@@ -279,10 +279,10 @@ class Meta(dict):
 		
 		if self.is_dir():
 			for file in self['info']['files']:
-				files.append(os.sep.join([self['info']['name']] + file['path']).decode('UTF-8'))
+				files.append(os.sep.join([self.base()] + file['path']).decode('UTF-8'))
 				size += file['length']
 		else:
-			files.append(self['info']['name'].decode('UTF-8'))
+			files.append(self.base())
 			size = self['info']['length']
 		
 		self['libtorrent_resume'] = {
@@ -291,10 +291,7 @@ class Meta(dict):
 		};
 		
 		for file in files:
-			if custom_storage:
-				file = self.datadir
-			else:
-				file = os.sep.join([self.datadir, file])
+			if custom_storage: file = self.datadir
 
 			if os.path.exists(file):
 				self['libtorrent_resume']['files'].append({'priority': long(2), 'mtime': long(os.stat(file).st_mtime)})
