@@ -246,7 +246,7 @@ class Meta(dict):
 		for (piece, check) in self.obfuscated_pieces_generator(hash_check, debug):
 			if hash_check and not check:
 				return False
-#			outfile.write(piece)
+			outfile.write(piece)
 		outfile.close()
 		os.utime(filename, (st.st_atime, st.st_mtime))
 		return True
