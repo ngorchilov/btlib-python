@@ -176,7 +176,7 @@ class Meta(dict):
 				return self['info']['name']
 					
 	def base(self):
-		return os.sep.join([self.datadir, self['info']['name']]).decode('UTF-8')
+		return os.sep.join([self.datadir, self['info']['name']])
 
 	def encode(self):
 		return btlib.bcode.bencode(self)
