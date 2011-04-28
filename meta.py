@@ -89,9 +89,9 @@ class Meta(dict):
 		
 	def pieces_generator(self, hash_check=True, debug=False):
 		"""Yield pieces and their sha1 checksum from data file(s)."""
+		pieces = StringIO.StringIO(self['info']['pieces'])
 		piece_length = self['info']['piece length']
-		if hash_check:
-			pieces = StringIO.StringIO(self['info']['pieces'])
+		check = True
 
 		if 'files' in self['info']: # yield pieces from a multi-file torrent
 			piece = ""
@@ -106,62 +106,61 @@ class Meta(dict):
 						sfile.close()
 						break
 					
-					if hash_check:
-						yield (piece, hashlib.sha1(piece).digest() == pieces.read(20))
-					else:
-						yield (piece, True)
+					piece_hash = pieces.read(20)
+					if hash_check: check = hashlib.sha1(piece).digest() == piece_hash
+					yield (piece, piece_hash, check)
 						
 					piece = ""
 			# Last piece
-			if piece != "": # If found
-				if hash_check:
-					yield (piece, hashlib.sha1(piece).digest() == pieces.read(20))
-				else:
-					yield (piece, True)
+			piece_hash = pieces.read(20)
+			if piece != "": # Last piece
+				if hash_check: check = hashlib.sha1(piece).digest() == piece_hash
+				yield (piece, piece_hash, check)
 				if debug: print "OK"
-			elif hash_check and pieces.read(20): # If data finished but there still unerad piece hashes in the stream report this fact
-				yield (None, False)
-			
+			elif hash_check and piece_hash: # If data finished but there still unerad piece hashes in the stream report this fact
+				if debug: print "ERR"
+				yield (None, piece_hash, False)
 		else: # yield pieces from a single file torrent
 			path =  self.base()
 			if debug: print "%s: " % path,
 			sfile = open(path, "rb")
 			while True:
 				piece = sfile.read(piece_length)
+				piece_hash = pieces.read(20)
 				if not piece:
 					sfile.close()
 					
 					# ensure we've read all pieces
-					if pieces.read(20):
-						yield (None, False)
+					if hash_check and piece_hash:
+						if debug: print "ERR"
+						yield (None, piece_hash, False)
 					else:
 						if debug: print "OK"
-				if hash_check:
-					yield (piece, hashlib.sha1(piece).digest() == pieces.read(20))
-				else:
-					yield (piece, True)
+					return
+
+				if hash_check: check = hashlib.sha1(piece).digest() == piece_hash
+				yield (piece, piece_hash, check)
 
 	def obfuscated_pieces_generator(self, hash_check=True, debug=False):
-		pieces = StringIO.StringIO(self['info']['pieces'])
 		pos = 0
 		
-		for (piece, check) in self.pieces_generator(hash_check, debug):
+		for (piece, piece_hash, check) in self.pieces_generator(hash_check, debug):
 
 			# hash-check
 			if hash_check and not check:
-				yield (None, False)
+				yield (None, piece_hash, False)
 
 			# obfuscate the piece data piece's sha1
-			piece = self.obfuscate(piece, pieces.read(20), pos)
+			piece = self.obfuscate(piece, piece_hash, pos)
 
 			# yeld the piece
-			yield (piece, check)
+			yield (piece, piece_hash, check)
 			
 			# set new position
 			pos += self['info']['piece length']
 
 	def hash_check(self, debug=False):
-		for (piece, check) in self.pieces_generator(True, debug):
+		for (piece, piece_hash, check) in self.pieces_generator(True, debug):
 			if not check:
 				if debug: print "ERR"
 				return False
@@ -243,7 +242,7 @@ class Meta(dict):
 		st = os.stat(self.base())
 		outfile = open(filename, 'wb')
 #		os.utime(filename, (st.st_atime, st.st_mtime))
-		for (piece, check) in self.obfuscated_pieces_generator(hash_check, debug):
+		for (piece, piece_hash, check) in self.obfuscated_pieces_generator(hash_check, debug):
 			if hash_check and not check:
 				return False
 			outfile.write(piece)
